@@ -3,19 +3,21 @@ import React, { PureComponent } from 'react';
 import { DashboardModel, PanelModel } from 'app/features/dashboard/state';
 import { JSONFormatter, Drawer, Select, Table, TabsBar, Tab, TabContent } from '@grafana/ui';
 import { getLocationSrv, getDataSourceSrv } from '@grafana/runtime';
-import { DataFrame, DataSourceApi, SelectableValue, applyFieldOverrides } from '@grafana/data';
+import { DataFrame, DataSourceApi, SelectableValue, applyFieldOverrides, DataQueryError } from '@grafana/data';
 import { config } from 'app/core/config';
 
 interface Props {
   dashboard: DashboardModel;
   panel: PanelModel;
+  selectedTab: InspectTab;
 }
 
-enum InspectTab {
+export enum InspectTab {
   Data = 'data',
   Raw = 'raw',
   Issue = 'issue',
   Meta = 'meta', // When result metadata exists
+  Error = 'error',
 }
 
 interface State {
@@ -24,6 +26,9 @@ interface State {
 
   // Data frem the last response
   data: DataFrame[];
+
+  // Error from query
+  error: DataQueryError;
 
   // The selected data frame
   selected: number;
@@ -41,7 +46,8 @@ export class PanelInspector extends PureComponent<Props, State> {
     this.state = {
       data: [],
       selected: 0,
-      tab: InspectTab.Data,
+      tab: props.selectedTab || InspectTab.Data,
+      error: {},
     };
   }
 
@@ -62,6 +68,8 @@ export class PanelInspector extends PureComponent<Props, State> {
     // Find the first DataSource wanting to show custom metadata
     let metaDS: DataSourceApi;
     const data = lastResult?.series as DataFrame[];
+    const error = lastResult?.error as DataQueryError;
+
     if (data) {
       for (const frame of data) {
         const key = frame.meta?.datasource;
@@ -80,12 +88,13 @@ export class PanelInspector extends PureComponent<Props, State> {
       last: lastResult,
       data,
       metaDS,
+      error,
     });
   }
 
   onDismiss = () => {
     getLocationSrv().update({
-      query: { inspect: null },
+      query: { inspect: null, tab: null },
       partial: true,
     });
   };
@@ -149,9 +158,17 @@ export class PanelInspector extends PureComponent<Props, State> {
     return <div>TODO: show issue form</div>;
   }
 
+  renderErrorTab(error?: DataQueryError) {
+    if (!error) {
+      return <div>No error </div>;
+    }
+
+    return <span>{error.message}</span>;
+  }
+
   render() {
     const { panel } = this.props;
-    const { last, tab } = this.state;
+    const { last, tab, error } = this.state;
     if (!panel) {
       this.onDismiss(); // Try to close the component
       return null;
@@ -161,6 +178,7 @@ export class PanelInspector extends PureComponent<Props, State> {
       { label: 'Data', value: InspectTab.Data },
       { label: 'Issue', value: InspectTab.Issue },
       { label: 'Raw JSON', value: InspectTab.Raw },
+      { label: 'Error', value: InspectTab.Error },
     ];
     if (this.state.metaDS) {
       tabs.push({ label: 'Meta Data', value: InspectTab.Meta });
@@ -169,8 +187,15 @@ export class PanelInspector extends PureComponent<Props, State> {
     return (
       <Drawer title={panel.title} onClose={this.onDismiss}>
         <TabsBar>
-          {tabs.map(t => {
-            return <Tab label={t.label} active={t.value === tab} onChangeTab={() => this.onSelectTab(t)} />;
+          {tabs.map((t, index) => {
+            return (
+              <Tab
+                key={`${t.value}-${index}`}
+                label={t.label}
+                active={t.value === tab}
+                onChangeTab={() => this.onSelectTab(t)}
+              />
+            );
           })}
         </TabsBar>
         <TabContent>
@@ -185,6 +210,7 @@ export class PanelInspector extends PureComponent<Props, State> {
               <JSONFormatter json={last} open={2} />
             </div>
           )}
+          {tab === InspectTab.Error && this.renderErrorTab(error)}
         </TabContent>
       </Drawer>
     );
