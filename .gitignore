@@ -61,7 +61,6 @@ profile.cov
 /pkg/cmd/grafana-server/grafana-server
 /pkg/cmd/grafana-server/debug
 /pkg/extensions
-!/pkg/extensions/main.go
 /public/app/extensions
 debug.test
 /examples/*/dist

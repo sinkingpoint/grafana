@@ -1,4 +1,5 @@
 import React, { PureComponent } from 'react';
+import AutoSizer from 'react-virtualized-auto-sizer';
 
 import { DashboardModel, PanelModel } from 'app/features/dashboard/state';
 import { JSONFormatter, Drawer, Select, Table, TabsBar, Tab, TabContent } from '@grafana/ui';
@@ -115,7 +116,7 @@ export class PanelInspector extends PureComponent<Props, State> {
     return <metaDS.components.MetadataInspector datasource={metaDS} data={data} />;
   }
 
-  renderDataTab() {
+  renderDataTab(width: number) {
     const { data, selected } = this.state;
     if (!data || !data.length) {
       return <div>No Data</div>;
@@ -149,7 +150,7 @@ export class PanelInspector extends PureComponent<Props, State> {
           </div>
         )}
 
-        <Table width={330} height={400} data={processed[selected]} />
+        <Table width={width} height={400} data={processed[selected]} />
       </div>
     );
   }
@@ -199,18 +200,29 @@ export class PanelInspector extends PureComponent<Props, State> {
           })}
         </TabsBar>
         <TabContent>
-          {tab === InspectTab.Data && this.renderDataTab()}
+          <AutoSizer disableHeight>
+            {({ width }) => {
+              if (width === 0) {
+                return null;
+              }
+              return (
+                <div style={{ width }}>
+                  {tab === InspectTab.Data && this.renderDataTab(width)}
 
-          {tab === InspectTab.Meta && this.renderMetadataInspector()}
+                  {tab === InspectTab.Meta && this.renderMetadataInspector()}
 
-          {tab === InspectTab.Issue && this.renderIssueTab()}
+                  {tab === InspectTab.Issue && this.renderIssueTab()}
 
-          {tab === InspectTab.Raw && (
-            <div>
-              <JSONFormatter json={last} open={2} />
-            </div>
-          )}
-          {tab === InspectTab.Error && this.renderErrorTab(error)}
+                  {tab === InspectTab.Raw && (
+                    <div>
+                      <JSONFormatter json={last} open={2} />
+                    </div>
+                  )}
+                  {tab === InspectTab.Error && this.renderErrorTab(error)}
+                </div>
+              );
+            }}
+          </AutoSizer>
         </TabContent>
       </Drawer>
     );
